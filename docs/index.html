@@ -94,8 +94,10 @@ select{font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid var(--l
 <main id="app"><div class="empty">読み込み中…</div></main>
 <nav class="tabs">
   <a href="#/" data-tab="spots"><span class="i">📍</span>釣り場</a>
-  <a href="#/catches" data-tab="catches"><span class="i">🐟</span>新着釣果</a>
+  <a href="#/catches" data-tab="catches"><span class="i">🐟</span>釣果</a>
   <a href="#/tide" data-tab="tide"><span class="i">🌊</span>潮見表</a>
+  <a href="#/rigs" data-tab="rigs"><span class="i">🎣</span>仕掛け</a>
+  <a href="#/memory" data-tab="memory"><span class="i">📸</span>メモリー</a>
   <a href="#/events" data-tab="events"><span class="i">📅</span>イベント</a>
 </nav>
 <script>
@@ -248,6 +250,7 @@ function viewSpot(id){
     ${tideWidget(s.tide, s.id)}
     <h2>🐟 釣果情報 <span class="sub">${cs.length}件</span></h2>
     ${cs.length ? cs.slice(0,20).map(c => catchCard(c,false)).join("") : `<div class="card empty">最近の釣果情報は見つかりませんでした。<br>下のSNS・アングラーズも見てみてください。</div>`}
+    <div id="spotExtra"></div>
     <h2>💬 SNS・口コミを探す</h2>
     <div class="grid sns">${sns.map(([i,l,u]) => `<a href="${esc(u)}" target="_blank" rel="noopener"><span class="i">${i}</span>${esc(l)}</a>`).join("")}</div>
     <div class="sub" style="margin-top:4px">X・Instagramは公式APIが有料/非公開のため、アプリの検索結果を直接開きます。</div>
@@ -310,15 +313,25 @@ function statusBlock(){
 }
 
 // ---------- router
-function render(){
+let renderSeq = 0;
+async function render(){
   if(!D) return;
   const h = location.hash.replace(/^#\/?/, "");
   const [p, arg] = h.split("/");
-  const tab = p === "spot" || !p ? "spots" : p;
+  const tab = p === "spot" || !p ? "spots" : (window.EXT_TAB || {})[p] || p;
   document.querySelectorAll("nav.tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
-  const v = {catches: viewCatches, tide: viewTide, events: viewEvents}[p];
-  $("#app").innerHTML = p === "spot" ? viewSpot(arg) : v ? v() : viewSpots();
+  const v = {catches: viewCatches, tide: viewTide, events: viewEvents, ...(window.EXT_VIEWS || {})}[p];
+  const seq = ++renderSeq;
+  window.beforeRender?.();
+  let html = p === "spot" ? viewSpot(arg) : v ? v(arg) : viewSpots();
+  if(html instanceof Promise){
+    html = await html.catch(e => `<div class="empty">表示できませんでした: ${esc(e.message || e)}</div>`);
+    if(seq !== renderSeq) return; // 待っている間に別の画面へ移動した
+  }
+  $("#app").innerHTML = html;
+  window.afterRender?.(p, arg);
 }
+window.render = render;
 document.addEventListener("click", e => {
   const fav = e.target.closest("[data-fav]");
   if(fav){ e.preventDefault(); const id = fav.dataset.fav, f = favs(); store.set("favs", f.includes(id) ? f.filter(x=>x!==id) : [...f, id]); render(); return; }
@@ -331,10 +344,12 @@ document.addEventListener("change", e => { if(e.target.id === "tsel"){ store.set
 addEventListener("hashchange", () => { render(); scrollTo(0,0); });
 
 fetch("data.json?" + Date.now()).then(r => r.json()).then(d => {
-  D = d;
+  D = window.APP_DATA = d;
   $("#upd").innerHTML = `更新<br>${fmtDate(d.generated)}`;
   render();
 }).catch(err => { $("#app").innerHTML = `<div class="empty">データを読み込めませんでした<br>${esc(err)}</div>`; });
 </script>
+<script src="rigs.js"></script>
+<script src="app2.js"></script>
 </body>
 </html>
