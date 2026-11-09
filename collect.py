@@ -387,6 +387,16 @@ def main() -> int:
     ev_src = {"amagasaki": ama_ev, "news": news_ev, "fishingmax": src_fishingmax_events(data["fishingmax"])}
     events = sorted((e for v in ev_src.values() for e in v), key=lambda e: e["date"], reverse=True)
 
+    # 外部サイト・OpenStreetMap 由来のURLは http(s) 以外を捨てる（javascript: リンク対策）
+    ok_url = lambda u: isinstance(u, str) and re.match(r"https?://", u) is not None
+    catches = [c for c in catches if ok_url(c.get("url"))]
+    events = [e for e in events if ok_url(e.get("url"))]
+    safety = [e for e in safety if ok_url(e.get("url"))]
+    for lst in (data["shops"] or {}).values():
+        for sh in lst:
+            if sh.get("web") and not ok_url(sh["web"]):
+                sh["web"] = ""
+
     out = {
         "generated": iso(NOW), "spots": SPOTS, "tide_stations": TIDE_STATIONS,
         "catches": catches, "catches_by_source": by_src,

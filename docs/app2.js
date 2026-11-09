@@ -94,7 +94,7 @@
       <h2>🎣 合う仕掛け</h2>
       ${rigs.length ? rigs.map(r => `<a class="card link" href="#/rig/${r.id}"><div class="row"><span style="font-size:22px">${r.icon}</span><div class="grow"><div class="title">${esc(r.name)}</div><div class="sub">${stars(r.level)} ${levelLabel[r.level]}</div></div><span class="sub">›</span></div></a>`).join("") : `<div class="empty">登録なし</div>`}
       <h2>🐟 最近の釣果</h2>
-      ${cs.length ? cs.map(c => `<a class="card link" href="${esc(c.url)}" target="_blank" rel="noopener"><div class="sub">${esc(c.source)} ・ ${esc(spotName(c.spot))}</div><div class="title">${esc(c.title)}</div></a>`).join("") : `<div class="empty">最近の記事なし</div>`}
+      ${cs.length ? cs.map(c => `<a class="card link" href="${esc(window.safeUrl(c.url))}" target="_blank" rel="noopener"><div class="sub">${esc(c.source)} ・ ${esc(spotName(c.spot))}</div><div class="title">${esc(c.title)}</div></a>`).join("") : `<div class="empty">最近の記事なし</div>`}
       ${mems.length ? `<h2>📸 自分の記録</h2>${await galleryGrid(mems)}` : ""}`;
   }
 
@@ -254,7 +254,7 @@
   const fmtD = s => { const d = new Date(s + "T00:00:00+09:00"); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`; };
 
   async function galleryGrid(list) {
-    return `<div class="gal">${list.map(m => `<a href="#/mem/${m.id}" class="gi">
+    return `<div class="gal">${list.map(m => `<a href="#/mem/${esc(m.id)}" class="gi">
         ${m.photos?.[0] ? `<img data-photo="${esc(m.photos[0])}" alt="">` : `<span class="noimg">🐟</span>`}
         <span class="cap">${esc(m.fish || "")}${m.size ? " " + esc(m.size) + "cm" : ""}</span>
         ${m.photos?.length > 1 ? `<span class="cnt">${m.photos.length}</span>` : ""}</a>`).join("")}</div>`;
@@ -299,7 +299,7 @@
         <tr><th>仕掛け</th><td>${rig ? `<a href="#/rig/${rig.id}">${rig.icon} ${esc(rig.name)}</a>` : esc(m.rigText || "-")}</td></tr>
         ${m.bait ? `<tr><th>エサ等</th><td>${esc(m.bait)}</td></tr>` : ""}
       </table>${m.memo ? `<div style="margin-top:8px;white-space:pre-wrap">${esc(m.memo)}</div>` : ""}</div>
-      <div class="row" style="gap:8px"><a class="btn" href="#/memedit/${m.id}">✏ 編集</a><button class="btn ghost danger" data-act="delmem" data-id="${m.id}">🗑 削除</button></div>`;
+      <div class="row" style="gap:8px"><a class="btn" href="#/memedit/${esc(m.id)}">✏ 編集</a><button class="btn ghost danger" data-act="delmem" data-id="${esc(m.id)}">🗑 削除</button></div>`;
   }
 
   // ---- 入力フォーム
@@ -456,6 +456,8 @@
       if (meta.app !== "hyogo-fishing") throw new Error("このアプリのバックアップではありません");
       let n = 0;
       for (const m of meta.memories) {
+        if (typeof m.id !== "string" || !/^[\w-]{1,40}$/.test(m.id)) continue; // 不正なデータは読み込まない
+        m.photos = (m.photos || []).filter(k => typeof k === "string" && /^[\w-]{1,80}$/.test(k));
         const photos = (m.photos || []).filter(k => z[`photos/${k}.jpg`]).map(k => ({
           key: k, full: new Blob([z[`photos/${k}.jpg`]], { type: "image/jpeg" }),
           thumb: new Blob([z[`thumbs/${k}.jpg`] || z[`photos/${k}.jpg`]], { type: "image/jpeg" }),
